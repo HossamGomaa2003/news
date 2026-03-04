@@ -1,113 +1,137 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'Category_Screen.dart';
 import '../Widgets/news_drawer.dart';
 import 'Search_Screen.dart';
+import '../theme_provider.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
+  String _getGreeting() {
+    var hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Good Morning';
+    } else if (hour < 17) {
+      return 'Good Afternoon';
+    } else {
+      return 'Good Evening';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    var themeProvider = Provider.of<ThemeProvider>(context);
+    bool isDark = themeProvider.themeMode == ThemeMode.dark;
+    ThemeData theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
         centerTitle: true,
-        title: const Text(
+        title: Text(
           'Home',
-          style: TextStyle(color: Colors.white, fontSize: 20),
+          style: theme.appBarTheme.titleTextStyle,
         ),
         leading: Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
+            icon: Icon(Icons.menu, color: isDark ? Colors.white : Colors.black),
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search, color: Colors.white),
+            icon: Icon(Icons.search, color: isDark ? Colors.white : Colors.black),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const SearchScreen()),
+                MaterialPageRoute(builder: (context) => SearchScreen()),
               );
             },
           ),
         ],
       ),
-      drawer: const NewsDrawer(),
+      drawer: NewsDrawer(),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Good Morning',
+            Text(
+              _getGreeting(),
               style: TextStyle(
-                color: Colors.white,
+                color: isDark ? Colors.white : Colors.black,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const Text(
+            Text(
               'Here is some News For You',
               style: TextStyle(
-                color: Colors.white70,
+                color: isDark ? Colors.white70 : Colors.black54,
                 fontSize: 16,
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
             Expanded(
               child: ListView(
                 children: [
                   _buildCategoryCard(
                     context,
                     'General',
-                    'assets/images/general.png',
-                    false, // Start with Right
+                    'general',
+                    false,
+                    isDark,
                   ),
                   const SizedBox(height: 16),
                   _buildCategoryCard(
                     context,
                     'Business',
-                    'assets/images/busniess.png',
-                    true, // Left
+                    'busniess',
+                    true,
+                    isDark,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   _buildCategoryCard(
                     context,
                     'Sports',
-                    'assets/images/sport.png',
-                    false, // Right
+                    'sport',
+                    false,
+                    isDark,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   _buildCategoryCard(
                     context,
                     'Health',
-                    'assets/images/helth.png',
-                    true, // Left
+                    'helth',
+                    true,
+                    isDark,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   _buildCategoryCard(
                     context,
                     'Science',
-                    'assets/images/science.png',
-                    false, // Right
+                    'science',
+                    false,
+                    isDark,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   _buildCategoryCard(
                     context,
                     'Technology',
-                    'assets/images/technology.png',
-                    true, // Left
+                    'technology',
+                    true,
+                    isDark,
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   _buildCategoryCard(
                     context,
                     'Entertainment',
-                    'assets/images/entertainment.png',
-                    false, // Right
+                    'entertainment',
+                    false,
+                    isDark,
                   ),
                 ],
               ),
@@ -119,7 +143,11 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildCategoryCard(
-      BuildContext context, String title, String imagePath, bool isLeft) {
+      BuildContext context, String title, String imageBaseName, bool isLeft, bool isDark) {
+    String imagePath = isDark
+        ? 'assets/images/${imageBaseName}Dark.png'
+        : 'assets/images/${imageBaseName}.png';
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -138,27 +166,25 @@ class HomeScreen extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            // Image - Background
             Positioned.fill(
               child: Image.asset(
                 imagePath,
                 fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey),
               ),
             ),
-            // Semi-transparent overlay
             Positioned.fill(
               child: Container(
-                color: Colors.black.withValues(alpha: 0.1),
+                color: Colors.black.withOpacity(0.1),
               ),
             ),
-            // Title
             Positioned(
               top: 40,
               left: isLeft ? 30 : null,
               right: isLeft ? null : 30,
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontSize: 36,
                   fontWeight: FontWeight.bold,
@@ -172,21 +198,20 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
             ),
-            // View All Button
             Positioned(
               bottom: 20,
               left: isLeft ? 20 : null,
               right: isLeft ? null : 20,
               child: Container(
-                padding: const EdgeInsets.only(left: 20, right: 8, top: 8, bottom: 8),
+                padding: EdgeInsets.only(left: 20, right: 8, top: 8, bottom: 8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: Colors.white.withOpacity(0.8),
                   borderRadius: BorderRadius.circular(40),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
+                    Text(
                       'View All',
                       style: TextStyle(
                         color: Colors.black,
@@ -194,14 +219,14 @@ class HomeScreen extends StatelessWidget {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(width: 15),
+                    SizedBox(width: 15),
                     Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
+                      padding: EdgeInsets.all(8),
+                      decoration: BoxDecoration(
                         color: Colors.black,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.arrow_forward_ios,
                         color: Colors.white,
                         size: 16,

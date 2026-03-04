@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:news/Screens/News_Screen.dart';
+import 'package:news/Screens/Search_Screen.dart';
+import 'package:news/Widgets/news_drawer.dart';
+import 'package:news/core/api_manager.dart';
+import 'package:news/models/sources_response.dart';
+import 'package:news/models/news_response.dart';
 
 class CategoryScreen extends StatelessWidget {
   final String categoryName;
@@ -6,75 +12,271 @@ class CategoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 5,
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        appBar: AppBar(
-          backgroundColor: Colors.black,
-          elevation: 0,
-          centerTitle: true,
-          title: Text(
-            categoryName,
-            style: const TextStyle(color: Colors.white, fontSize: 20),
+    var theme = Theme.of(context);
+    return FutureBuilder<SourcesResponse?>(
+      future: ApiManager.getSources(categoryName.toLowerCase()),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            appBar: AppBar(title: Text(categoryName)),
+            drawer: NewsDrawer(
+              onCategoryClick: () {
+                Navigator.pop(context);
+                Navigator.pop(context);
+              },
+            ),
+            body: Center(
+                child: CircularProgressIndicator(
+                    color: theme.textTheme.bodyLarge?.color)),
+          );
+        }
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(title: Text(categoryName)),
+            drawer: NewsDrawer(
+              onCategoryClick: () {
+                Navigator.pop(context);
+              },
+            ),
+            body: Center(
+              child: Text(
+                "Error: ${snapshot.error}",
+                style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+              ),
+            ),
+          );
+        }
+
+        var sources = snapshot.data?.sources ?? [];
+
+        if (sources.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(title: Text(categoryName)),
+            drawer: NewsDrawer(
+              onCategoryClick: () {
+                Navigator.pop(context);
+              },
+            ),
+            body: Center(
+              child: Text(
+                "No Sources Found",
+                style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+              ),
+            ),
+          );
+        }
+
+        return DefaultTabController(
+          length: sources.length,
+          child: Scaffold(
+            drawer: NewsDrawer(
+              onCategoryClick: () {
+                Navigator.pop(context);
+                Navigator.pop(context);
+              },
+            ),
+            appBar: AppBar(
+              title: Text(categoryName),
+              actions: [
+                IconButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SearchScreen(),
+                      ),
+                    );
+                  },
+                  icon: Icon(Icons.search, size: 30),
+                ),
+              ],
+              bottom: TabBar(
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                indicatorColor: theme.textTheme.bodyLarge?.color,
+                indicatorWeight: 3,
+                labelColor: theme.textTheme.bodyLarge?.color,
+                unselectedLabelColor: theme.textTheme.bodyLarge?.color?.withOpacity(0.7),
+                labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                tabs: sources.map((source) => Tab(text: source.name)).toList(),
+              ),
+            ),
+            body: TabBarView(
+              children: sources
+                  .map((source) => NewsListWidget(sourceId: source.id ?? ""))
+                  .toList(),
+            ),
           ),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.search, color: Colors.white),
-              onPressed: () {},
+        );
+      },
+    );
+  }
+}
+
+class NewsListWidget extends StatelessWidget {
+  final String sourceId;
+  const NewsListWidget({super.key, required this.sourceId});
+
+  @override
+  Widget build(BuildContext context) {
+    var theme = Theme.of(context);
+    return FutureBuilder<NewsResponse?>(
+      future: ApiManager.getNewsData(sourceId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(
+              child: CircularProgressIndicator(
+                  color: theme.textTheme.bodyLarge?.color));
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              "Error: ${snapshot.error}",
+              style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+            ),
+          );
+        }
+
+        var articles = snapshot.data?.articles ?? [];
+
+        if (articles.isEmpty) {
+          return Center(
+            child: Text(
+              "No News Found",
+              style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+            ),
+          );
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: articles.length,
+          separatorBuilder: (context, index) => SizedBox(height: 20),
+          itemBuilder: (context, index) {
+            return NewsCard(article: articles[index]);
+          },
+        );
+      },
+    );
+  }
+}
+
+class NewsCard extends StatelessWidget {
+  final Articles article;
+  const NewsCard({super.key, required this.article});
+
+  @override
+  Widget build(BuildContext context) {
+    var theme = Theme.of(context);
+    return GestureDetector(
+      onTap: () => _showNewsDetails(context, article),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.textTheme.bodyLarge?.color ?? Colors.grey, width: 0.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              child: Image.network(
+                article.urlToImage ?? "",
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return SizedBox(
+                    height: 200,
+                    child: Center(
+                        child: CircularProgressIndicator(
+                            color: theme.textTheme.bodyLarge?.color)),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) => Image.asset(
+                  'assets/images/general.png',
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    article.title ?? "",
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: theme.textTheme.titleLarge?.color,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'By: ${article.author ?? article.source?.name ?? "Unknown"}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                              fontSize: 14),
+                        ),
+                      ),
+                      Text(
+                        _formatDate(article.publishedAt),
+                        style: TextStyle(
+                            color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                            fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
-          bottom: const TabBar(
-            isScrollable: true,
-            indicatorColor: Colors.white,
-            indicatorWeight: 3,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            labelStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            tabs: [
-              Tab(text: 'ABC News'),
-              Tab(text: 'Aftenposten'),
-              Tab(text: 'ANSA.it'),
-              Tab(text: 'Ary News'),
-              Tab(text: 'Axios'),
-            ],
-          ),
-        ),
-        body: TabBarView(
-          children: List.generate(5, (index) => _buildNewsList(context)),
         ),
       ),
     );
   }
 
-  Widget _buildNewsList(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: 5,
-      separatorBuilder: (context, index) => const SizedBox(height: 20),
-      itemBuilder: (context, index) {
-        return GestureDetector(
-          onTap: () => _showNewsDetails(context),
-          child: _buildNewsCard(context),
-        );
-      },
-    );
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return "";
+    try {
+      DateTime dateTime = DateTime.parse(dateStr);
+      return "${dateTime.day}/${dateTime.month}/${dateTime.year}";
+    } catch (e) {
+      return "";
+    }
   }
 
-  void _showNewsDetails(BuildContext context) {
+  void _showNewsDetails(BuildContext context, Articles article) {
+    var isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    Color bgColor = isDark ? Colors.white : const Color(0xFF171717);
+    Color textColor = isDark ? Colors.black : Colors.white;
+    Color buttonBg = isDark ? Colors.black : Colors.white;
+    Color buttonText = isDark ? Colors.white : Colors.black;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
         return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            color: Colors.white,
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: bgColor,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
@@ -82,105 +284,57 @@ class CategoryScreen extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.asset(
-                  'assets/images/general.png',
+                child: Image.network(
+                  article.urlToImage ?? "",
                   height: 240,
                   width: double.infinity,
                   fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Image.asset(
+                    'assets/images/general.png',
+                    height: 240,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'A 40-year-old man has fallen approximately 200 feet to his death while canyoneering with three others at Zion National Park in Utah, authorities confirmed.\n\nThe incident occurred on Saturday when the...',
+              SizedBox(height: 16),
+              Text(
+                article.description ?? article.content ?? "No description available",
                 style: TextStyle(
-                  color: Colors.black,
+                  color: textColor,
                   fontSize: 16,
                   height: 1.5,
                 ),
               ),
-              const SizedBox(height: 8),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '[+1529 chars]',
-                  style: TextStyle(color: Colors.grey, fontSize: 14),
-                ),
-              ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => NewsScreen(article: article),
+                    ),
+                  );
+                },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.black,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 55),
+                  backgroundColor: buttonBg,
+                  foregroundColor: buttonText,
+                  minimumSize: Size(double.infinity, 55),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
+                child: Text(
                   'View Full Article',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: 10),
             ],
           ),
         );
       },
-    );
-  }
-
-  Widget _buildNewsCard(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white, width: 0.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            child: Image.asset(
-              'assets/images/general.png',
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '40-year-old man falls 200 feet to his death while canyoneering at national park',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'By: CNN',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                    Text(
-                      '3 hours ago',
-                      style: TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
